@@ -5,7 +5,8 @@ set -euo pipefail
 # - An MPI C++ compiler wrapper (mpicxx or mpic++) is available in PATH.
 # - The compiler supports C++17 and OpenMP.
 # - OpenBLAS development headers/libraries are installed and linkable with -lopenblas.
-# - Git is available to clone the SBD repository if it is not already present.
+# - Git is available, with access to the SBD repository, to clone it if it is not
+#   already present or to fetch the pinned commit into an existing checkout.
 
 
 # Always operate in this script directory to avoid accidental cleanup in cwd.
@@ -13,7 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 REPO_URL="${SBD_REPO_URL:-https://github.com/r-ccs-cms/sbd.git}"
-SBD_COMMIT="${SBD_COMMIT:-d3210615ec36581ec3a286b8e339492f20b4b529}"
+# main.cc needs an SBD revision that contains SBD commit 8ff3f46 (det_vector API).
+SBD_COMMIT="${SBD_COMMIT:-ee9d33e62cf8483754504de513e8307426e5198e}"
 SBD_DIR="${SBD_DIR:-${SCRIPT_DIR}/sbd}"
 
 # Default portable build flags
@@ -45,6 +47,11 @@ else
 fi
 
 echo "Checking out SBD commit: $SBD_COMMIT"
+# An existing clone is never updated above, so it may predate the pinned commit.
+if ! git -C "$SBD_DIR" cat-file -e "${SBD_COMMIT}^{commit}" 2>/dev/null; then
+    echo "SBD commit $SBD_COMMIT not found in $SBD_DIR; fetching from $REPO_URL"
+    git -C "$SBD_DIR" fetch "$REPO_URL" "$SBD_COMMIT" || git -C "$SBD_DIR" fetch "$REPO_URL"
+fi
 git -C "$SBD_DIR" checkout "$SBD_COMMIT"
 
 # Clean previous build
